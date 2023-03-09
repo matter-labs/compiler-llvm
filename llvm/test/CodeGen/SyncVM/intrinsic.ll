@@ -58,10 +58,10 @@ define i256 @txoriginr() {
   ret i256 %res
 }
 
-; CHECK-LABEL: ergsleftr
-define i256 @ergsleftr() {
-; CHECK: context.ergs_left r1
-  %res = call i256 @llvm.syncvm.ergsleft()
+; CHECK-LABEL: gasleftr
+define i256 @gasleftr() {
+; CHECK: context.gas_left r1
+  %res = call i256 @llvm.syncvm.gasleft()
   ret i256 %res
 }
 
@@ -88,7 +88,7 @@ define void @inctx() {
 
 ; CHECK-LABEL: setprice
 define void @setprice(i256 %p) {
-; CHECK: context.set_ergs_per_pubdata
+; CHECK: context.set_gas_per_pubdata
   call void @llvm.syncvm.setpubdataprice(i256 %p)
   ret void
 }
@@ -214,7 +214,7 @@ define i256 @ifgtii() {
 }
 
 ; CHECK-LABEL: invoke.farcall
-define {i8 addrspace(3)*, i1} @invoke.farcall() {
+define {i8 addrspace(3)*, i1} @invoke.farcall() noinline {
   ; CHECK: near_call r0, @__farcall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__farcall(i256 0, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -222,7 +222,7 @@ define {i8 addrspace(3)*, i1} @invoke.farcall() {
 }
 
 ; CHECK-LABEL: invoke.staticcall
-define {i8 addrspace(3)*, i1} @invoke.staticcall() {
+define {i8 addrspace(3)*, i1} @invoke.staticcall() noinline {
   ; CHECK: near_call r0, @__staticcall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__staticcall(i256 0, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -230,7 +230,7 @@ define {i8 addrspace(3)*, i1} @invoke.staticcall() {
 }
 
 ; CHECK-LABEL: invoke.delegatecall
-define {i8 addrspace(3)*, i1} @invoke.delegatecall() {
+define {i8 addrspace(3)*, i1} @invoke.delegatecall() noinline {
   ; CHECK: near_call r0, @__delegatecall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__delegatecall(i256 0, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -238,7 +238,7 @@ define {i8 addrspace(3)*, i1} @invoke.delegatecall() {
 }
 
 ; CHECK-LABEL: invoke.mimiccall
-define {i8 addrspace(3)*, i1} @invoke.mimiccall() {
+define {i8 addrspace(3)*, i1} @invoke.mimiccall() noinline {
   ; CHECK: near_call r0, @__mimiccall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__mimiccall(i256 0, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 42)
@@ -246,7 +246,7 @@ define {i8 addrspace(3)*, i1} @invoke.mimiccall() {
 }
 
 ; CHECK-LABEL: invoke.system_call
-define {i8 addrspace(3)*, i1} @invoke.system_call() {
+define {i8 addrspace(3)*, i1} @invoke.system_call() noinline {
   ; CHECK: near_call r0, @__farcall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__farcall(i256 0, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -254,7 +254,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_call() {
 }
 
 ; CHECK-LABEL: invoke.system_staticcall
-define {i8 addrspace(3)*, i1} @invoke.system_staticcall() {
+define {i8 addrspace(3)*, i1} @invoke.system_staticcall() noinline {
   ; CHECK: near_call r0, @__staticcall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__staticcall(i256 0, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -262,7 +262,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_staticcall() {
 }
 
 ; CHECK-LABEL: invoke.system_delegatecall
-define {i8 addrspace(3)*, i1} @invoke.system_delegatecall() {
+define {i8 addrspace(3)*, i1} @invoke.system_delegatecall() noinline {
   ; CHECK: near_call r0, @__delegatecall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__delegatecall(i256 0, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -270,7 +270,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_delegatecall() {
 }
 
 ; CHECK-LABEL: invoke.system_mimiccall
-define {i8 addrspace(3)*, i1} @invoke.system_mimiccall() {
+define {i8 addrspace(3)*, i1} @invoke.system_mimiccall() noinline {
   ; CHECK: near_call r0, @__mimiccall, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__mimiccall(i256 0, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 4)
@@ -278,7 +278,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_mimiccall() {
 }
 
 ; CHECK-LABEL: invoke.farcall_byref
-define {i8 addrspace(3)*, i1} @invoke.farcall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.farcall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__farcall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__farcall_byref(i8 addrspace(3)* %a1, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -286,7 +286,7 @@ define {i8 addrspace(3)*, i1} @invoke.farcall_byref(i8 addrspace(3)* %a1) {
 }
 
 ; CHECK-LABEL: invoke.staticcall_byref
-define {i8 addrspace(3)*, i1} @invoke.staticcall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.staticcall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__staticcall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__staticcall_byref(i8 addrspace(3)* %a1, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -294,7 +294,7 @@ define {i8 addrspace(3)*, i1} @invoke.staticcall_byref(i8 addrspace(3)* %a1) {
 }
 
 ; CHECK-LABEL: invoke.delegatecall_byref
-define {i8 addrspace(3)*, i1} @invoke.delegatecall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.delegatecall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__delegatecall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__delegatecall_byref(i8 addrspace(3)* %a1, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -302,7 +302,7 @@ define {i8 addrspace(3)*, i1} @invoke.delegatecall_byref(i8 addrspace(3)* %a1) {
 }
 
 ; CHECK-LABEL: invoke.mimiccall_byref
-define {i8 addrspace(3)*, i1} @invoke.mimiccall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.mimiccall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__mimiccall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__mimiccall_byref(i8 addrspace(3)* %a1, i256 0, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 42)
@@ -310,7 +310,7 @@ define {i8 addrspace(3)*, i1} @invoke.mimiccall_byref(i8 addrspace(3)* %a1) {
 }
 
 ; CHECK-LABEL: invoke.system_call_byref
-define {i8 addrspace(3)*, i1} @invoke.system_call_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.system_call_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__farcall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__farcall_byref(i8 addrspace(3)* %a1, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -318,7 +318,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_call_byref(i8 addrspace(3)* %a1) {
 }
 
 ; CHECK-LABEL: invoke.system_staticcall_byref
-define {i8 addrspace(3)*, i1} @invoke.system_staticcall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.system_staticcall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__staticcall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__staticcall_byref(i8 addrspace(3)* %a1, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -326,7 +326,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_staticcall_byref(i8 addrspace(3)* %
 }
 
 ; CHECK-LABEL: invoke.system_delegatecall_byref
-define {i8 addrspace(3)*, i1} @invoke.system_delegatecall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.system_delegatecall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__delegatecall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__delegatecall_byref(i8 addrspace(3)* %a1, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef)
@@ -334,7 +334,7 @@ define {i8 addrspace(3)*, i1} @invoke.system_delegatecall_byref(i8 addrspace(3)*
 }
 
 ; CHECK-LABEL: invoke.system_mimiccall_byref
-define {i8 addrspace(3)*, i1} @invoke.system_mimiccall_byref(i8 addrspace(3)* %a1) {
+define {i8 addrspace(3)*, i1} @invoke.system_mimiccall_byref(i8 addrspace(3)* %a1) noinline {
   ; CHECK: near_call r0, @__mimiccall_byref, @DEFAULT_UNWIND
   ; CHECK-NEXT: ret
   %res = call {i8 addrspace(3)*, i1} @__mimiccall_byref(i8 addrspace(3)* %a1, i256 1, i256 2, i256 3, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 undef, i256 4)
@@ -396,7 +396,7 @@ declare i256 @llvm.syncvm.caller()
 declare i256 @llvm.syncvm.codesource()
 declare i256 @llvm.syncvm.meta()
 declare i256 @llvm.syncvm.txorigin()
-declare i256 @llvm.syncvm.ergsleft()
+declare i256 @llvm.syncvm.gasleft()
 declare i256 @llvm.syncvm.getu128()
 declare void @llvm.syncvm.setu128(i256)
 declare void @llvm.syncvm.inctx()

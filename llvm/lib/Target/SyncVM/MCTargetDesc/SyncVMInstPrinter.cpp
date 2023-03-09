@@ -98,8 +98,8 @@ void SyncVMInstPrinter::printContextOperand(const MCInst *MI, unsigned OpNo,
   case SyncVMCTX::TX_ORIGIN:
     O << ".tx_origin";
     break;
-  case SyncVMCTX::ERGS_LEFT:
-    O << ".ergs_left";
+  case SyncVMCTX::GAS_LEFT:
+    O << ".gas_left";
     break;
   case SyncVMCTX::SP:
     O << ".sp";
@@ -117,18 +117,8 @@ void SyncVMInstPrinter::printContextOperand(const MCInst *MI, unsigned OpNo,
     O << ".inc_tx_num";
     break;
   case SyncVMCTX::SET_PUBDATAPRICE:
-    O << ".set_ergs_per_pubdata";
+    O << ".set_gas_per_pubdata";
     break;
-  }
-}
-
-void SyncVMInstPrinter::printEAFOperand(const MCInst *MI, unsigned OpNo,
-                                        raw_ostream &O) {
-  const MCOperand &EAF = MI->getOperand(OpNo);
-  assert(EAF.isImm() &&
-         "Expected immediate in exteranal address storage field");
-  if (EAF.getImm() == 1) {
-    O << ".e";
   }
 }
 

@@ -15,6 +15,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
 #include "llvm/Transforms/Scalar/MergeSimilarBB.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -30,16 +31,12 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSyncVMTarget() {
   // TODO: optimize switch lowering
   auto &PR = *PassRegistry::getPassRegistry();
   initializeLowerSwitchLegacyPassPass(PR);
-  initializeSyncVMExpandUMAPass(PR);
-  initializeSyncVMIndirectUMAPass(PR);
-  initializeSyncVMIndirectExternalCallPass(PR);
   initializeSyncVMCodegenPreparePass(PR);
   initializeSyncVMExpandPseudoPass(PR);
   initializeSyncVMExpandSelectPass(PR);
   initializeSyncVMLowerIntrinsicsPass(PR);
   initializeSyncVMLinkRuntimePass(PR);
   initializeSyncVMAllocaHoistingPass(PR);
-  initializeSyncVMPeepholePass(PR);
   initializeSyncVMCombineFlagSettingPass(PR);
   initializeSyncVMStackAddressConstantPropagationPass(PR);
 }
@@ -80,6 +77,7 @@ void SyncVMTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
   PB.registerPipelineStartEPCallback(
       [](ModulePassManager &PM, OptimizationLevel Level) {
         PM.addPass(SyncVMLinkRuntimePass());
+        PM.addPass(GlobalDCEPass());
       });
 
   PB.registerScalarOptimizerLateEPCallback(
@@ -131,18 +129,18 @@ void SyncVMPassConfig::addPreRegAlloc() {
   addPass(createSyncVMAddConditionsPass());
   addPass(createSyncVMStackAddressConstantPropagationPass());
   addPass(createSyncVMBytesToCellsPass());
-  if (TM->getOptLevel() != CodeGenOpt::None)
+  if (TM->getOptLevel() != CodeGenOpt::None) {
     // The pass combines sub.s! 0, x, y with x definition. It assumes only one
     // usage of every definition of Flags. This is guaranteed by the selection
     // DAG. Every pass that break this assumption is expected to be sequenced
     // after SyncVMCombineFlagSetting.
     addPass(createSyncVMCombineFlagSettingPass());
+    // This pass emits indexed loads and stores
+    addPass(createSyncVMCombineToIndexedMemopsPass());
+  }
 }
 
 void SyncVMPassConfig::addPreEmitPass() {
   addPass(createSyncVMExpandSelectPass());
   addPass(createSyncVMExpandPseudoPass());
-  // TODO: The pass combines store with MULxxrr, DIVxxrr regardles of whether
-  // the destination register has one use. Should be fixed and reenabled.
-  addPass(createSyncVMPeepholePass());
 }

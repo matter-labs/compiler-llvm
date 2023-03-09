@@ -294,9 +294,6 @@ void PassManagerBuilder::populateFunctionPassManager(
 
   addInitialAliasAnalysisPasses(FPM);
 
-  // SyncVM local begin
-  FPM.add(createMergeSimilarBBPass());
-  // SyncVM local end
   // Lower llvm.expect to metadata before attempting transforms.
   // Compare/branch metadata may alter the behavior of passes like SimplifyCFG.
   FPM.add(createLowerExpectIntrinsicPass());
@@ -517,9 +514,7 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
   PM.add(createCFGSimplificationPass(SimplifyCFGOptions()
                                          .forwardSwitchCondToPhi(true)
                                          .convertSwitchRangeToICmp(true)
-                                         // SyncVM local begin
-                                         .convertSwitchToLookupTable(false)
-                                         // SyncVM local end
+                                         .convertSwitchToLookupTable(true)
                                          .needCanonicalLoops(false)
                                          .hoistCommonInsts(true)
                                          .sinkCommonInsts(true)));
@@ -643,9 +638,6 @@ void PassManagerBuilder::populateModulePassManager(
 
   MPM.add(createInstructionCombiningPass()); // Clean up after IPCP & DAE
   addExtensionsToPM(EP_Peephole, MPM);
-  // SyncVM local begin
-  MPM.add(createMergeSimilarBBPass());
-  // SyncVM local end
   MPM.add(
       createCFGSimplificationPass(SimplifyCFGOptions().convertSwitchRangeToICmp(
           true))); // Clean up after IPCP & DAE
@@ -799,9 +791,6 @@ void PassManagerBuilder::populateModulePassManager(
   // flattening of blocks.
   MPM.add(createDivRemPairsPass());
 
-  // SyncVM local begin
-  MPM.add(createMergeSimilarBBPass());
-  // SyncVM local end
   // LoopSink (and other loop passes since the last simplifyCFG) might have
   // resulted in single-entry-single-exit or empty blocks. Clean up the CFG.
   MPM.add(createCFGSimplificationPass(

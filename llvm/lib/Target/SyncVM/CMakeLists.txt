@@ -17,13 +17,16 @@ add_public_tablegen_target(SyncVMCommonTableGen)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/syncvm-runtime.ll RT_CONTENT)
 set (RT_CONTENT "R\"(${RT_CONTENT})\"")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/SyncVMRT.inc ${RT_CONTENT})
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/syncvm-stdlib.ll STDLIB_CONTENT)
+set (STDLIB_CONTENT "R\"(${STDLIB_CONTENT})\"")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/SyncVMStdLib.inc ${STDLIB_CONTENT})
 
 add_llvm_target(SyncVMCodeGen
   SyncVMAddConditions.cpp
   SyncVMBytesToCells.cpp
   SyncVMCodegenPrepare.cpp
   SyncVMCombineFlagSetting.cpp
-  SyncVMExpandUMA.cpp
+  SyncVMCombineToIndexedMemops.cpp
   SyncVMExpandPseudoInsts.cpp
   SyncVMExpandSelect.cpp
   SyncVMTargetMachine.cpp
@@ -37,13 +40,10 @@ add_llvm_target(SyncVMCodeGen
   SyncVMFrameLowering.cpp
   SyncVMISelDAGToDAG.cpp
   SyncVMISelLowering.cpp
-  SyncVMIndirectUMA.cpp
-  SyncVMIndirectExternalCall.cpp
   SyncVMLinkRuntime.cpp
   SyncVMLowerIntrinsics.cpp
   SyncVMAllocaHoisting.cpp
   SyncVMTargetTransformInfo.cpp
-  SyncVMPeephole.cpp
   SyncVMStackAddressConstantPropagation.cpp
 
   LINK_COMPONENTS
