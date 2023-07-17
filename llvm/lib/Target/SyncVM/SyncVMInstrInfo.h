@@ -17,9 +17,146 @@
 namespace llvm {
 
 namespace SyncVM {
+
 int getPseudoMapOpcode(uint16_t);
 int getFlagSettingOpcode(uint16_t);
 int getNonFlagSettingOpcode(uint16_t);
+
+/// Return opcode of the instruction with RR input addressing mode otherwise
+/// identical to \p Opcode.
+int getWithRRInAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with IR input addressing mode otherwise
+/// identical to \p Opcode. For a fat pointer instruction return an opcode with
+/// operands swapped (i.e. XR).
+int getWithIRInAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with CR input addressing mode otherwise
+/// identical to \p Opcode. For a fat pointer instruction return an opcode with
+/// operands swapped (i.e. YR).
+int getWithCRInAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with SR input addressing mode otherwise
+/// identical to \p Opcode.
+int getWithSRInAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with RR otput addressing mode otherwise
+/// identical to \p Opcode.
+int getWithRROutAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with SR otput addressing mode otherwise
+/// identical to \p Opcode.
+int getWithSROutAddrMode(uint16_t Opcode);
+/// Return opcode of the instruction with operands not swapped
+/// otherwise identical to \p Opcode.
+int getWithInsNotSwapped(uint16_t Opcode);
+/// Return opcode of the instruction with operands swapped otherwise identical
+/// to \p Opcode.
+int getWithInsSwapped(uint16_t Opcode);
+
+/// \defgroup AMProperties Addressing mode properties
+/// Functions to identify in and out addressing mode of an instruction
+/// @{
+bool hasRRInAddressingMode(unsigned Opcode);
+bool hasIRInAddressingMode(unsigned Opcode);
+bool hasCRInAddressingMode(unsigned Opcode);
+bool hasSRInAddressingMode(unsigned Opcode);
+bool hasRROutAddressingMode(unsigned Opcode);
+bool hasSROutAddressingMode(unsigned Opcode);
+inline bool hasRRInAddressingMode(const MachineInstr &MI) {
+  return hasRRInAddressingMode(MI.getOpcode());
+}
+inline bool hasIRInAddressingMode(const MachineInstr &MI) {
+  return hasIRInAddressingMode(MI.getOpcode());
+}
+inline bool hasCRInAddressingMode(const MachineInstr &MI) {
+  return hasCRInAddressingMode(MI.getOpcode());
+}
+inline bool hasSRInAddressingMode(const MachineInstr &MI) {
+  return hasSRInAddressingMode(MI.getOpcode());
+}
+inline bool hasRROutAddressingMode(const MachineInstr &MI) {
+  return hasRROutAddressingMode(MI.getOpcode());
+}
+inline bool hasSROutAddressingMode(const MachineInstr &MI) {
+  return hasSROutAddressingMode(MI.getOpcode());
+}
+/// @}
+
+bool isSelect(unsigned Opcode);
+inline bool isSelect(const MachineInstr &MI) {
+  return isSelect(MI.getOpcode());
+}
+
+enum class ArgumentKind { In0, In1, Out0, Out1 };
+
+enum class ArgumentType { Register, Immediate, Code, Stack };
+
+/// Return argument addressing mode for a specified argument.
+ArgumentType argumentType(ArgumentKind Kind, unsigned Opcode);
+inline ArgumentType argumentType(ArgumentKind Kind, const MachineInstr &MI) {
+  return argumentType(Kind, MI.getOpcode());
+}
+
+/// Return number of Machine Operands that represent an ISA operand of \p Type.
+inline unsigned argumentSize(ArgumentType Type) {
+  switch (Type) {
+  case ArgumentType::Register:
+  case ArgumentType::Immediate:
+    return 1;
+  case ArgumentType::Code:
+    return 2;
+  case ArgumentType::Stack:
+    return 3;
+  }
+  llvm_unreachable("Unexpected argument type");
+}
+
+/// Return number of Machine Operands that represent an ISA operand.
+inline unsigned argumentSize(ArgumentKind Kind, const MachineInstr &MI) {
+  return argumentSize(argumentType(Kind, MI));
+}
+
+/// \defgroup ISAOperandIt MOP iterators to instruction operands as per ISA.
+/// Return machine operand iterator to the beginning of an ISA operand.
+/// @{
+MachineInstr::mop_iterator in0Iterator(MachineInstr &MI);
+MachineInstr::mop_iterator in1Iterator(MachineInstr &MI);
+MachineInstr::mop_iterator out0Iterator(MachineInstr &MI);
+MachineInstr::mop_iterator out1Iterator(MachineInstr &MI);
+/// @}
+
+/// \defgroup ISAOperandRange MOP ranges to instruction operands as per ISA.
+/// Return machine operand range of an ISA operand.
+/// @{
+inline auto in0Range(MachineInstr &MI) {
+  auto It = in0Iterator(MI);
+  return make_range(It, It + argumentSize(ArgumentKind::In0, MI));
+}
+inline auto in1Range(MachineInstr &MI) {
+  auto It = in1Iterator(MI);
+  return make_range(It, It + argumentSize(ArgumentKind::In1, MI));
+}
+inline auto out0Range(MachineInstr &MI) {
+  auto It = out0Iterator(MI);
+  return make_range(It, It + argumentSize(ArgumentKind::Out0, MI));
+}
+inline auto out1Range(MachineInstr &MI) {
+  auto It = out1Iterator(MI);
+  return make_range(It, It + argumentSize(ArgumentKind::Out1, MI));
+}
+/// @}
+
+/// Copy \p OpRange to \p Inst.
+inline void copyOperands(MachineInstrBuilder &Inst,
+                         iterator_range<MachineInstr::mop_iterator> OpRange) {
+  for (MachineOperand &MO : OpRange)
+    Inst.add(MO);
+}
+
+/// Copy \p OpRange to \p Inst.
+inline void copyOperands(MachineInstrBuilder &Inst,
+                         MachineInstr::mop_iterator OpBegin,
+                         MachineInstr::mop_iterator OpEnd) {
+  for (MachineOperand &MO : make_range(OpBegin, OpEnd))
+    Inst.add(MO);
+}
+
 } // namespace SyncVM
 
 class SyncVMInstrInfo : public SyncVMGenInstrInfo {
@@ -27,14 +164,6 @@ class SyncVMInstrInfo : public SyncVMGenInstrInfo {
   virtual void anchor();
 
 public:
-  enum GenericInstruction {
-    Unsupported = 0,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-  };
-
   explicit SyncVMInstrInfo();
 
   /// getRegisterInfo - TargetInstrInfo is a superset of MRegister info.  As
@@ -77,11 +206,6 @@ public:
   int64_t getFramePoppedByCallee(const MachineInstr &I) const { return 0; }
 
   // Properties and mappings
-  bool hasRROperandAddressingMode(const MachineInstr &MI) const;
-  bool hasRIOperandAddressingMode(const MachineInstr &MI) const;
-  bool hasRXOperandAddressingMode(const MachineInstr &MI) const;
-  bool hasRSOperandAddressingMode(const MachineInstr &MI) const;
-  bool hasTwoOuts(const MachineInstr &MI) const;
   bool isAdd(const MachineInstr &MI) const;
   bool isSub(const MachineInstr &MI) const;
   bool isMul(const MachineInstr &MI) const;
@@ -122,11 +246,10 @@ public:
   bool isNOP(const MachineInstr &MI) const;
 
   bool isSilent(const MachineInstr &MI) const;
-  GenericInstruction genericInstructionFor(const MachineInstr &MI) const;
 
   void tagFatPointerCopy(MachineInstr &) const override;
 
-  bool isFlagSettingInstruction(uint16_t opcode) const {
+  static bool isFlagSettingInstruction(uint16_t opcode) {
     // a reverse lookup: for an `_v` instruction, it should return values
     // other than -1
     return SyncVM::getNonFlagSettingOpcode(opcode) != -1;
@@ -134,6 +257,37 @@ public:
 
   bool isPredicatedInstr(const MachineInstr &MI) const;
   SyncVMCC::CondCodes getCCCode(const MachineInstr &MI) const;
+
+  // TODO: Enable this.
+  // bool shouldOutlineFromFunctionByDefault(MachineFunction &MF) const
+  // override;
+
+  /// Return true if the function can safely be outlined from.
+  bool isFunctionSafeToOutlineFrom(MachineFunction &MF,
+                                   bool OutlineFromLinkOnceODRs) const override;
+
+  /// Return true if MBB is safe to outline from, and return any target-specific
+  /// information in Flags.
+  bool isMBBSafeToOutlineFrom(MachineBasicBlock &MBB,
+                              unsigned &Flags) const override;
+
+  /// Return if/how a given MachineInstr should be outlined.
+  outliner::InstrType getOutliningType(MachineBasicBlock::iterator &MBBI,
+                                       unsigned Flags) const override;
+
+  /// Calculate target-specific information for a set of outlining candidates.
+  outliner::OutlinedFunction getOutliningCandidateInfo(
+      std::vector<outliner::Candidate> &RepeatedSequenceLocs) const override;
+
+  /// Insert a custom frame for outlined functions.
+  void buildOutlinedFrame(MachineBasicBlock &MBB, MachineFunction &MF,
+                          const outliner::OutlinedFunction &OF) const override;
+
+  /// Insert a call to an outlined function into a given basic block.
+  MachineBasicBlock::iterator
+  insertOutlinedCall(Module &M, MachineBasicBlock &MBB,
+                     MachineBasicBlock::iterator &It, MachineFunction &MF,
+                     outliner::Candidate &C) const override;
 };
 
 } // namespace llvm

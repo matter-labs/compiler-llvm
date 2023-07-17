@@ -2601,7 +2601,14 @@ CheckInteger(const unsigned char *MatcherTable, unsigned &MatcherIndex,
   Val = decodeSignRotatedValue(Val);
 
   ConstantSDNode *C = dyn_cast<ConstantSDNode>(N);
-  return C && C->getSExtValue() == Val;
+  // SyncVM local begin
+  if (C) {
+    const APInt &CVal = C->getAPIntValue();
+    if (CVal == APInt(CVal.getBitWidth(), Val, /*isSigned=*/true))
+      return true;
+  }
+  return false;
+  // SyncVM local end
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE static bool
