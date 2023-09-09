@@ -14,7 +14,11 @@ deprecated==1.2.13
     # via pygithub
 gitdb==4.0.9
     # via gitpython
-gitpython==3.1.26
+< snyk-fix-f32e1c519b48cc099fd5687f21165dcf
+gitpython==3.1.33
+=
+gitpython==3.1.35
+>> v1.3.1
     # via -r requirements.txt.in
 idna==3.3
     # via requests

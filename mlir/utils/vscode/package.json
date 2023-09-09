@@ -35,8 +35,13 @@
     "git-clang-format": "git-clang-format"
   },
   "dependencies": {
+< snyk-upgrade-7bf210238d3fd8e84e776eaa4f879b73
     "chokidar": "3.5.3",
     "vscode-languageclient": "^8.0.2-next.5"
+=
+    "chokidar": "3.5.2",
+    "vscode-languageclient": "^8.1.0"
+> v1.3.1
   },
   "devDependencies": {
     "@types/mocha": "^7.0.2",
