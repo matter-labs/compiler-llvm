@@ -24,6 +24,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+// EraVM local begin
+#include "llvm/ADT/StringSet.h"
+// EraVM local end
 #include "llvm/Analysis/TargetFolder.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -1700,10 +1703,12 @@ bool llvm::canConstantFoldCallTo(const CallBase *Call, const Function *F) {
     // Check for various function names that get used for the math functions
     // when the header files are preprocessed with the macro
     // __FINITE_MATH_ONLY__ enabled.
-    // The '12' here is the length of the shortest name that can match.
+    // EraVM local begin
+    // The '8' here is the length of the shortest name that can match.
     // We need to check the size before looking at Name[1] and Name[2]
     // so we may as well check a limit that will eliminate mismatches.
-    if (Name.size() < 12 || Name[1] != '_')
+    if (Name.size() < 5 || Name[1] != '_')
+    // EraVM local end
       return false;
     switch (Name[2]) {
     default:
@@ -1711,19 +1716,39 @@ bool llvm::canConstantFoldCallTo(const CallBase *Call, const Function *F) {
     case 'a':
       return Name == "__acos_finite" || Name == "__acosf_finite" ||
              Name == "__asin_finite" || Name == "__asinf_finite" ||
-             Name == "__atan2_finite" || Name == "__atan2f_finite";
+             Name == "__atan2_finite" || Name == "__atan2f_finite" ||
+    // EraVM local begin
+             Name == "__addmod";
+    case 'b':
+      return Name == "__byte";
+    // EraVM local end
     case 'c':
       return Name == "__cosh_finite" || Name == "__coshf_finite";
+    // EraVM local begin
+    case 'd':
+      return Name == "__div";
+    // EraVM local end
     case 'e':
       return Name == "__exp_finite" || Name == "__expf_finite" ||
-             Name == "__exp2_finite" || Name == "__exp2f_finite";
+             Name == "__exp2_finite" || Name == "__exp2f_finite" ||
+    // EraVM local begin
+             Name == "__exp";
+    // EraVM local end
     case 'l':
       return Name == "__log_finite" || Name == "__logf_finite" ||
              Name == "__log10_finite" || Name == "__log10f_finite";
+    // EraVM local begin
+    case 'm':
+      return Name == "__mulmod" || Name == "__mod" || Name == "__mstore8";
+    // EraVM local end
     case 'p':
       return Name == "__pow_finite" || Name == "__powf_finite";
     case 's':
-      return Name == "__sinh_finite" || Name == "__sinhf_finite";
+      return Name == "__sinh_finite" || Name == "__sinhf_finite" ||
+    // EraVM local begin
+             Name == "__signextend" || Name == "__sdiv" || Name == "__smod" ||
+             Name == "__shl" || Name == "__shr" || Name == "__sar";
+    // EraVM local end
     }
   }
 }
@@ -2436,6 +2461,171 @@ static Constant *evaluateCompare(const APFloat &Op1, const APFloat &Op2,
   return nullptr;
 }
 
+// EraVM local begin
+/// Extending length of two’s complement signed integer.
+/// NumByte: the size in bytes minus one of the integer to sign extend.
+/// Val: the integer being extended.
+static Constant *ConstantFoldSignextendCall(Type *Ty, const APInt &NumByte,
+                                            const APInt &Val) {
+  unsigned BitWidth = Ty->getIntegerBitWidth();
+  const APInt NumBits = NumByte * 8 + 7;
+  const APInt NumBitInv = APInt(BitWidth, BitWidth) - NumBits;
+  const APInt SignMask = APInt(BitWidth, 1).shl(NumBits);
+  const APInt ValMask = APInt::getAllOnes(BitWidth).lshr(NumBitInv);
+  const APInt Ext1 = APInt::getAllOnes(BitWidth).shl(NumBits);
+  const APInt SignVal = SignMask & Val;
+  const APInt ValClean = Val & ValMask;
+  const APInt Sext = SignVal.isZero() ? APInt::getZero(BitWidth) : Ext1;
+  const APInt Result = Sext | ValClean;
+  return ConstantInt::get(Ty, Result);
+}
+
+/// Exponential operation.
+/// Calculates:
+///   (base ** exp) (mod 2**256)
+/// This is an implementation of the binary exponentiation algorithm.
+static Constant *ConstantFoldExpCall(Type *Ty, const APInt &Base,
+                                     const APInt &Exp) {
+  const unsigned BitWidth = Ty->getIntegerBitWidth();
+  if (Base == 0 && Exp != 0)
+    return Constant::getNullValue(Ty);
+  if (Base == 1 || (Base == 0 && Exp == 0))
+    return ConstantInt::get(Ty, APInt(BitWidth, 1));
+  if (Base == 2 && Exp.ule(255))
+    return ConstantInt::get(Ty, APInt(BitWidth, 1).shl(Exp));
+
+  // The target algorithm is an implementation of the following C code,
+  // where m = 2 ** 256 and 'long long' type is replaced with i256 one.
+  // long long binpow(long long a, long long b, long long m) {
+  //   a %= m;
+  //   long long res = 1;
+  //   while (b > 0) {
+  //     if (b & 1)
+  //       res = res * a % m;
+  //     a = a * a % m;
+  //     b >>= 1;
+  //   }
+  //   return res;
+  // }
+
+  // Perform calculations in double bit-width, as we need to
+  // multiply.
+  const unsigned ExtBitWidth = BitWidth * 2;
+  const APInt ModExt = APInt(ExtBitWidth, 1).shl(BitWidth);
+  APInt ResExt(ExtBitWidth, 1);
+  APInt BaseExt = Base.zext(ExtBitWidth);
+  APInt CurrExp = Exp;
+  while (CurrExp.ugt(0)) {
+    if (CurrExp[0])
+      ResExt = (ResExt * BaseExt).urem(ModExt);
+
+    BaseExt = (BaseExt * BaseExt).urem(ModExt);
+    CurrExp.lshrInPlace(1);
+  }
+  return ConstantInt::get(Ty, ResExt.trunc(BitWidth));
+}
+
+/// Unsigned integer division operation.
+/// Returns:
+///   0, if Divisor == 0,
+///   Dividend / Divisor, else
+static Constant *ConstantFoldDivCall(Type *Ty, const APInt &Dividend,
+                                     const APInt &Divisor) {
+  if (Divisor.isZero())
+    return Constant::getNullValue(Ty);
+
+  return ConstantInt::get(Ty, Dividend.udiv(Divisor));
+}
+
+/// Signed integer division operation.
+/// Returns:
+///   0, if Divisor == 0,
+///   -2 ** 255, if (Dividend == -2 ** 255) && (Divisor == -1),
+///   Dividend / Divisor, else
+static Constant *ConstantFoldSDivCall(Type *Ty, const APInt &Dividend,
+                                      const APInt &Divisor) {
+  if (Divisor.isZero())
+    return Constant::getNullValue(Ty);
+
+  if (Dividend.shl(1).isZero() && Divisor.isAllOnes())
+    return ConstantInt::get(Ty, Dividend);
+
+  return ConstantInt::get(Ty, Dividend.sdiv(Divisor));
+}
+
+/// Modulo remainder operation.
+/// Returns:
+///   0, if Mod == 0,
+///   Val (mod Mod), else
+static Constant *ConstantFoldModCall(Type *Ty, const APInt &Val,
+                                     const APInt &Mod) {
+  if (Mod.isZero())
+    return Constant::getNullValue(Ty);
+
+  return ConstantInt::get(Ty, Val.urem(Mod));
+}
+
+/// Signed modulo remainder operation.
+/// Returns:
+///   0, if Mod == 0,
+///   sign(Val) (|Val| (mod |Mod|)), else
+static Constant *ConstantFoldSModCall(Type *Ty, const APInt &Val,
+                                      const APInt &Mod) {
+  if (Mod.isZero())
+    return Constant::getNullValue(Ty);
+
+  return ConstantInt::get(Ty, Val.srem(Mod));
+}
+
+/// Left shift operation.
+/// Returns:
+///   (Val * (2 ** Shift)) (mod 2 ** 256)
+static Constant *ConstantFoldSHLCall(Type *Ty, const APInt &Shift,
+                                     const APInt &Val) {
+  // Please, note the case Shift >= BitWidth is properly handled by the
+  // APInt::shl(const APInt &) implementation returning zero value.
+  return ConstantInt::get(Ty, Val.shl(Shift));
+}
+
+/// Logical right shift operation.
+/// Returns:
+///   floor(Val / (2 ** Shift))
+static Constant *ConstantFoldSHRCall(Type *Ty, const APInt &Shift,
+                                     const APInt &Val) {
+  // Please, note the case Shift >= BitWidth is properly handled by the
+  // APInt::lshr(const APInt &) implementation returning zero value.
+  return ConstantInt::get(Ty, Val.lshr(Shift));
+}
+
+/// Arithmetic (signed) right shift operation.
+/// Returns:
+///   floor(Val / (2 ** Shift)), where 'Val' is treated as two’s complement
+///   signed 256-bit integer, if 'Shift' <= 255,
+///   0, if  'Val' >=0 && 'Shift' > 255,
+///   -1, if  'Val' < 0 && 'Shift' > 255,
+static Constant *ConstantFoldSARCall(Type *Ty, const APInt &Shift,
+                                     const APInt &Val) {
+  // Please, note all the three cases are properly handled by the
+  // APInt::ashr(const APInt &) implementation returning values
+  // as show in the description.
+  return ConstantInt::get(Ty, Val.ashr(Shift));
+}
+
+/// Retrieve single byte from i256 word.
+/// Returns:
+///   (Val << ByteIdx * 8) >> 248.
+///   For the Nth byte, we count from the left
+///   (i.e. N=0 would be the most significant in big endian),
+///   0, if ByteIdx > 255.
+static Constant *ConstantFoldByteCall(Type *Ty, const APInt &ByteIdx,
+                                      const APInt &Val) {
+  // Please, note the case ByteIdx > 31 is properly handled by the shl
+  // implementation, see the comments for ConstantFoldSHRCall.
+  unsigned BitWidth = Ty->getIntegerBitWidth();
+  return ConstantInt::get(Ty, Val.shl(ByteIdx * 8).lshr(BitWidth - 8));
+}
+// EraVM local end
+
 static Constant *ConstantFoldScalarCall2(StringRef Name,
                                          Intrinsic::ID IntrinsicID,
                                          Type *Ty,
@@ -2748,6 +2938,48 @@ static Constant *ConstantFoldScalarCall2(StringRef Name,
       return ConstantInt::get(Ty, C0->abs());
     }
 
+    // EraVM local begin
+    const StringSet<> LibFuncNames = {
+        "__signextend", "__exp", "__div", "__sdiv", "__mod",
+        "__smod",       "__shl", "__shr", "__sar",  "__byte"};
+
+    if (LibFuncNames.count(Name)) {
+      if (isa<PoisonValue>(Operands[0]) || isa<PoisonValue>(Operands[1]) ||
+          !C0 || !C1)
+        return PoisonValue::get(Ty);
+
+      const unsigned BitWidth = Ty->getIntegerBitWidth();
+      assert(BitWidth == 256);
+
+      if (Name == "__signextend") {
+        // Signextend operation returns original value if the extension
+        // overflows the type width.
+        if (C0->uge(APInt(BitWidth, BitWidth / 8 - 1)))
+          return Operands[1];
+
+        return ConstantFoldSignextendCall(Ty, *C0, *C1);
+      }
+      if (Name == "__exp")
+        return ConstantFoldExpCall(Ty, *C0, *C1);
+      if (Name == "__div")
+        return ConstantFoldDivCall(Ty, *C0, *C1);
+      if (Name == "__sdiv")
+        return ConstantFoldSDivCall(Ty, *C0, *C1);
+      if (Name == "__mod")
+        return ConstantFoldModCall(Ty, *C0, *C1);
+      if (Name == "__smod")
+        return ConstantFoldSModCall(Ty, *C0, *C1);
+      if (Name == "__shl")
+        return ConstantFoldSHLCall(Ty, *C0, *C1);
+      if (Name == "__shr")
+        return ConstantFoldSHRCall(Ty, *C0, *C1);
+      if (Name == "__sar")
+        return ConstantFoldSARCall(Ty, *C0, *C1);
+      if (Name == "__byte")
+        return ConstantFoldByteCall(Ty, *C0, *C1);
+    }
+    // EraVM local end
+
     return nullptr;
   }
 
@@ -2901,6 +3133,46 @@ static Constant *ConstantFoldAMDGCNPermIntrinsic(ArrayRef<Constant *> Operands,
   return ConstantInt::get(Ty, Val);
 }
 
+// EraVM local begin
+/// Unsigned modulo addition operation.
+/// Returns:
+///   0, if Mod == 0
+///   (Arg1 + Arg2) (mod Mod), if Mod != 0
+/// All intermediate calculations of this operation are not subject
+/// to the 2 ** 256 modulo.
+static Constant *ConstantFoldAddModCall(Type *Ty, const APInt &Arg1,
+                                        const APInt &Arg2, const APInt &Mod) {
+  const unsigned BitWidth = Ty->getIntegerBitWidth();
+  if (Mod.isZero())
+    return Constant::getNullValue(Ty);
+
+  // Sum representation of two N-bit values takes up to N + 1 bits.
+  const unsigned ExtBitWidth = BitWidth + 1;
+  const APInt Sum = Arg1.zext(ExtBitWidth) + Arg2.zext(ExtBitWidth);
+  const APInt Rem = Sum.urem(Mod.zext(ExtBitWidth));
+  return ConstantInt::get(Ty, Rem.trunc(BitWidth));
+}
+
+/// Unsigned modulo multiplication operation.
+/// Returns:
+///   0, if Mod == 0
+///   (Arg1 * Arg2) (mod Mod), if Mod != 0
+/// All intermediate calculations of this operation are not subject
+/// to the 2**256 modulo.
+static Constant *ConstantFoldMulModCall(Type *Ty, const APInt &Arg1,
+                                        const APInt &Arg2, const APInt &Mod) {
+  const unsigned BitWidth = Ty->getIntegerBitWidth();
+  if (Mod.isZero())
+    return Constant::getNullValue(Ty);
+
+  // Multiplication representation of two N-bit values takes up to 2 * N bits.
+  const unsigned ExtBitWidth = BitWidth * 2;
+  const APInt Product = Arg1.zext(ExtBitWidth) * Arg2.zext(ExtBitWidth);
+  const APInt Rem = Product.urem(Mod.zext(ExtBitWidth));
+  return ConstantInt::get(Ty, Rem.trunc(BitWidth));
+}
+// EraVM local end
+
 static Constant *ConstantFoldScalarCall3(StringRef Name,
                                          Intrinsic::ID IntrinsicID,
                                          Type *Ty,
@@ -3034,6 +3306,27 @@ static Constant *ConstantFoldScalarCall3(StringRef Name,
 
   if (IntrinsicID == Intrinsic::amdgcn_perm)
     return ConstantFoldAMDGCNPermIntrinsic(Operands, Ty);
+
+  // EraVM local begin
+  if (Name == "__addmod" || Name == "__mulmod") {
+    const APInt *C0, *C1, *C2;
+    if (!getConstIntOrUndef(Operands[0], C0) ||
+        !getConstIntOrUndef(Operands[1], C1) ||
+        !getConstIntOrUndef(Operands[2], C2))
+      return nullptr;
+
+    if (isa<PoisonValue>(Operands[0]) || isa<PoisonValue>(Operands[1]) ||
+        isa<PoisonValue>(Operands[2]) || !C0 || !C1 || !C2)
+      return PoisonValue::get(Ty);
+
+    assert(Ty->getIntegerBitWidth() == 256);
+
+    if (Name == "__addmod")
+      return ConstantFoldAddModCall(Ty, *C0, *C1, *C2);
+    if (Name == "__mulmod")
+      return ConstantFoldMulModCall(Ty, *C0, *C1, *C2);
+  }
+  // EraVM local end
 
   return nullptr;
 }

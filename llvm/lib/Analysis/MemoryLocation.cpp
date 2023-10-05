@@ -14,9 +14,9 @@
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-// SyncVM local begin
+// EraVM local begin
 #include "llvm/ADT/Triple.h"
-// SyncVM local end
+// EraVM local end
 using namespace llvm;
 
 void LocationSize::print(raw_ostream &OS) const {
@@ -168,11 +168,11 @@ MemoryLocation MemoryLocation::getForArgument(const CallBase *Call,
   if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(Call)) {
     const DataLayout &DL = II->getModule()->getDataLayout();
 
-    // SyncVM local begin
+    // EraVM local begin
     // check if the length is within i64 range. If not, return imprecise
     // location
     auto T = Call->getModule()->getTargetTriple();
-    if (Triple(T).isSyncVM()) {
+    if (Triple(T).isEraVM()) {
       switch (II->getIntrinsicID()) {
       case Intrinsic::memcpy:
       case Intrinsic::memcpy_inline:
@@ -189,11 +189,11 @@ MemoryLocation MemoryLocation::getForArgument(const CallBase *Call,
         // it is okay to have lifetime intrinsic
         break;
       default:
-        llvm_unreachable("Unexpected intrinsic for SyncVM target");
+        llvm_unreachable("Unexpected intrinsic for EraVM target");
         break;
       }
     }
-    // SyncVM local end
+    // EraVM local end
 
     switch (II->getIntrinsicID()) {
     default:
@@ -347,6 +347,13 @@ MemoryLocation MemoryLocation::getForArgument(const CallBase *Call,
               dyn_cast<ConstantInt>(Call->getArgOperand(3)))
         return MemoryLocation(
             Arg, LocationSize::upperBound(LenCI->getZExtValue()), AATags);
+      return MemoryLocation::getAfter(Arg, AATags);
+    case LibFunc_xvm_sha3:
+      assert((ArgIdx == 0) && "Invalid argument index for sha3");
+      if (const ConstantInt *LenCI =
+              dyn_cast<ConstantInt>(Call->getArgOperand(1)))
+        return MemoryLocation(Arg, LocationSize::precise(LenCI->getZExtValue()),
+                              AATags);
       return MemoryLocation::getAfter(Arg, AATags);
     default:
       break;

@@ -818,6 +818,32 @@ static void initialize(TargetLibraryInfoImpl &TLI, const Triple &T,
     TLI.setUnavailable(LibFunc_nvvm_reflect);
   }
 
+  // EraVM local begin
+  // There is really no runtime library on EraVM/EVM, apart from
+  // special functions written and linked on LLVM IR level.
+  if (T.isEraVM()) {
+    TLI.disableAllFunctions();
+    TLI.setAvailable(llvm::LibFunc_xvm_addmod);
+    TLI.setAvailable(llvm::LibFunc_xvm_exp);
+    TLI.setAvailable(llvm::LibFunc_xvm_exp_pow2);
+    TLI.setAvailable(llvm::LibFunc_xvm_mulmod);
+    TLI.setAvailable(llvm::LibFunc_xvm_signextend);
+    TLI.setAvailable(llvm::LibFunc_xvm_div);
+    TLI.setAvailable(llvm::LibFunc_xvm_sdiv);
+    TLI.setAvailable(llvm::LibFunc_xvm_mod);
+    TLI.setAvailable(llvm::LibFunc_xvm_smod);
+    TLI.setAvailable(llvm::LibFunc_xvm_shl);
+    TLI.setAvailable(llvm::LibFunc_xvm_shr);
+    TLI.setAvailable(llvm::LibFunc_xvm_sar);
+    TLI.setAvailable(llvm::LibFunc_xvm_byte);
+    TLI.setAvailable(llvm::LibFunc_xvm_mstore8);
+    TLI.setAvailable(llvm::LibFunc_xvm_revert);
+    TLI.setAvailable(llvm::LibFunc_xvm_return);
+    TLI.setAvailable(llvm::LibFunc_xvm_sha3);
+    return;
+  }
+  // EraVM local end
+
   // These vec_malloc/free routines are only available on AIX.
   if (!T.isOSAIX()) {
     TLI.setUnavailable(LibFunc_vec_calloc);
@@ -1544,6 +1570,48 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
   case LibFunc_cxa_guard_release:
   case LibFunc_nvvm_reflect:
     return (NumParams == 1 && FTy.getParamType(0)->isPointerTy());
+
+  // EraVM local begin
+  case LibFunc_xvm_exp:
+  case LibFunc_xvm_exp_pow2:
+  case LibFunc_xvm_signextend:
+  case LibFunc_xvm_div:
+  case LibFunc_xvm_sdiv:
+  case LibFunc_xvm_mod:
+  case LibFunc_xvm_smod:
+  case LibFunc_xvm_shl:
+  case LibFunc_xvm_shr:
+  case LibFunc_xvm_sar:
+  case LibFunc_xvm_byte:
+    return (NumParams == 2 && FTy.getParamType(0)->isIntegerTy(256) &&
+            FTy.getParamType(1)->isIntegerTy(256) &&
+            FTy.getReturnType()->isIntegerTy(256));
+
+  case LibFunc_xvm_mstore8:
+    return (NumParams == 2 && FTy.getParamType(0)->isPointerTy() &&
+            FTy.getParamType(1)->isIntegerTy(256) &&
+            FTy.getReturnType()->isVoidTy());
+
+  case LibFunc_xvm_addmod:
+  case LibFunc_xvm_mulmod:
+    return (NumParams == 3 && FTy.getParamType(0)->isIntegerTy(256) &&
+            FTy.getParamType(1)->isIntegerTy(256) &&
+            FTy.getParamType(2)->isIntegerTy(256) &&
+            FTy.getReturnType()->isIntegerTy(256));
+
+  case LibFunc_xvm_return:
+  case LibFunc_xvm_revert:
+    return (NumParams == 3 && FTy.getParamType(0)->isIntegerTy(256) &&
+            FTy.getParamType(1)->isIntegerTy(256) &&
+            FTy.getParamType(2)->isIntegerTy(256) &&
+            FTy.getReturnType()->isVoidTy());
+
+  case LibFunc_xvm_sha3:
+    return (NumParams == 3 && FTy.getParamType(0)->isPointerTy() &&
+            FTy.getParamType(1)->isIntegerTy(256) &&
+            FTy.getParamType(2)->isIntegerTy(1) &&
+            FTy.getReturnType()->isIntegerTy(256));
+  // EraVM local end
 
   case LibFunc_sincospi_stret:
   case LibFunc_sincospif_stret:

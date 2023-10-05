@@ -14,9 +14,9 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
-// SyncVM local begin
+// EraVM local begin
 #include "llvm/ADT/Triple.h"
-// SyncVM local end
+// EraVM local end
 #include "llvm/Analysis/CmpInstAnalysis.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/InstructionSimplify.h"
@@ -4489,16 +4489,16 @@ Instruction *InstCombinerImpl::foldICmpBinOp(ICmpInst &I,
     }
   }
 
-  // SyncVM local begin
-  // At this moment SyncVM sees a regression over folding umul
+  // EraVM local begin
+  // At this moment EraVM sees a regression over folding umul
   Triple TT(I.getFunction()->getParent()->getTargetTriple());
-  if (!TT.isSyncVM()) {
-  // SyncVM local end
+  if (!TT.isEraVM()) {
+  // EraVM local end
   if (Value *V = foldMultiplicationOverflowCheck(I))
     return replaceInstUsesWith(I, V);
-  // SyncVM local begin
+  // EraVM local begin
   }
-  // SyncVM local end
+  // EraVM local end
 
   if (Value *V = foldICmpWithLowBitMaskedVal(I, Builder))
     return replaceInstUsesWith(I, V);
@@ -6327,9 +6327,6 @@ Instruction *InstCombinerImpl::visitICmpInst(ICmpInst &I) {
       }
     }
 
-// SyncVM local begin
-// FIXME: support umulo
-#if 0
     // (zext a) * (zext b)  --> llvm.umul.with.overflow.
     if (match(Op0, m_Mul(m_ZExt(m_Value(A)), m_ZExt(m_Value(B))))) {
       if (Instruction *R = processUMulZExtIdiom(I, Op0, Op1, *this))
@@ -6339,8 +6336,6 @@ Instruction *InstCombinerImpl::visitICmpInst(ICmpInst &I) {
       if (Instruction *R = processUMulZExtIdiom(I, Op1, Op0, *this))
         return R;
     }
-#endif
-// SyncVM local end
   }
 
   if (Instruction *Res = foldICmpEquality(I))

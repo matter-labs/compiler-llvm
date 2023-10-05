@@ -19,8 +19,13 @@ namespace {
 
 template <int> struct Shadow;
 
+// EraVM local begin
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 struct WeirdIter : std::iterator<std::input_iterator_tag, Shadow<0>, Shadow<1>,
                                  Shadow<2>, Shadow<3>> {};
+#pragma GCC diagnostic pop
+// EraVM local end
 
 struct AdaptedIter : iterator_adaptor_base<AdaptedIter, WeirdIter> {};
 

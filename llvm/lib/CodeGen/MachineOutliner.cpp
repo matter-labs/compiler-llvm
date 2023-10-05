@@ -357,6 +357,13 @@ struct MachineOutliner : public ModulePass {
   /// The current repeat number of machine outlining.
   unsigned OutlineRepeatedNum = 0;
 
+  // EraVM local begin
+  /// Functions to fixup post outlining. It contains outlined function and all
+  /// caller functions.
+  std::vector<std::pair<MachineFunction *, std::vector<MachineFunction *>>>
+      FixupFunctions;
+  // EraVM local end
+
   /// Set to true if the outliner should run on all functions in the module
   /// considered safe for outlining.
   /// Set to true by default for compatibility with llc's -run-pass option.
@@ -784,6 +791,10 @@ bool MachineOutliner::outline(Module &M,
     const TargetSubtargetInfo &STI = MF->getSubtarget();
     const TargetInstrInfo &TII = *STI.getInstrInfo();
 
+    // EraVM local begin
+    FixupFunctions.push_back({MF, {}});
+    // EraVM local end
+
     // Replace occurrences of the sequence with calls to the new function.
     for (Candidate &C : OF.Candidates) {
       MachineBasicBlock &MBB = *C.getMBB();
@@ -792,6 +803,10 @@ bool MachineOutliner::outline(Module &M,
 
       // Insert the call.
       auto CallInst = TII.insertOutlinedCall(M, MBB, StartIt, *MF, C);
+
+      // EraVM local begin
+      FixupFunctions.back().second.push_back(C.getMF());
+      // EraVM local end
 
       // If the caller tracks liveness, then we need to make sure that
       // anything we outline doesn't break liveness assumptions. The outlined
@@ -1011,17 +1026,43 @@ bool MachineOutliner::runOnModule(Module &M) {
   if (!doOutline(M, OutlinedFunctionNum))
     return false;
 
-  for (unsigned I = 0; I < OutlinerReruns; ++I) {
+  // EraVM local begin
+  auto GetTII = [&]() -> const TargetInstrInfo * {
+    MachineModuleInfo &MMI =
+        getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
+    for (Function &F : M) {
+      MachineFunction *MF = MMI.getMachineFunction(F);
+      if (!MF)
+        continue;
+      if (const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo())
+        return TII;
+    }
+    report_fatal_error("Didn't find target instruction info.");
+  };
+
+  unsigned Reruns = OutlinerReruns;
+  if (!OutlinerReruns.getNumOccurrences())
+    Reruns = GetTII()->defaultOutlineReruns();
+
+  for (unsigned I = 0; I < Reruns; ++I) {
+  // EraVM local end
     OutlinedFunctionNum = 0;
     OutlineRepeatedNum++;
     if (!doOutline(M, OutlinedFunctionNum)) {
       LLVM_DEBUG({
         dbgs() << "Did not outline on iteration " << I + 2 << " out of "
-               << OutlinerReruns + 1 << "\n";
+               // EraVM local begin
+               << Reruns + 1 << "\n";
+               // EraVM local end
       });
       break;
     }
   }
+
+  // EraVM local begin
+  GetTII()->fixupPostOutlining(FixupFunctions);
+  FixupFunctions.clear();
+  // EraVM local end
 
   return true;
 }

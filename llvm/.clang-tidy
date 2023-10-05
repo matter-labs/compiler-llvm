@@ -1,1 +1,5 @@
 InheritParentConfig: true
+# EraVM local begin
+Checks: '-readability-identifier-naming'
+WarningsAsErrors: '*'
+# EraVM local end
