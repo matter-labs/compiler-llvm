@@ -1,6 +1,11 @@
-//===--- EraVMIndexedMemOpsPrepare.cpp - Prepare for indexed MemOps -------===//
+//===-- EraVMIndexedMemOpsPrepare.cpp - Prepare for indexed -----*- C++ -*-===//
 //
-// \file
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This pass intends to utilize the SCEV info to find load/store that can be
 // optimized to indexed load/store provided by EraVM.
 //
@@ -61,7 +66,7 @@
 //       We can use them to judge whether loop should exit. In this way, if
 //       loop index isn't used by any other places, we can optimize out loop
 //       index along with instruction used to increase its value.
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 #include "EraVM.h"
 
@@ -135,6 +140,8 @@ bool EraVMIndexedMemOpsPrepare::rewriteToFavorIndexedMemOps(
 
   Type *TypeOfCopyLen = IntegerType::getInt256Ty(*Ctx);
   BasicBlock *LoopPreheader = CurrentLoop->getLoopPreheader();
+  BasicBlock *LoopLatch = CurrentLoop->getLoopLatch();
+  assert(LoopPreheader && LoopLatch && "Expected a loop in a simplified form");
 
   Value *SrcOperand = getPointerOperand(BasePtr);
   Type *RstType = BasePtr->getResultElementType();
@@ -180,7 +187,7 @@ bool EraVMIndexedMemOpsPrepare::rewriteToFavorIndexedMemOps(
     cast<GetElementPtrInst>(IncNewBasePtr)->setIsInBounds(false);
 
   // Add to the PHI
-  NewBasePtr->addIncoming(IncNewBasePtr, MemOpInst->getParent());
+  NewBasePtr->addIncoming(IncNewBasePtr, LoopLatch);
 
   return true;
 }
@@ -216,6 +223,10 @@ bool EraVMIndexedMemOpsPrepare::isValidGEPAndIncByOneCell(
   const PHINode *PHI = dyn_cast<PHINode>(LastIndexOperand);
   if (!PHI)
     return false;
+
+  assert(std::all_of(
+    BasePtr->op_begin(), std::prev(BasePtr->op_end()),
+    [this](Value *V) { return CurrentLoop->isLoopInvariant(V); }));
 
   return true;
 }
