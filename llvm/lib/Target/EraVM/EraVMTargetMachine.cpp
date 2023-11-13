@@ -45,9 +45,11 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeEraVMTarget() {
   initializeEraVMExternalAAWrapperPass(PR);
   initializeEraVMLinkRuntimePass(PR);
   initializeEraVMLowerIntrinsicsPass(PR);
+  initializeEraVMIndexedMemOpsPreparePass(PR);
   initializeEraVMOptimizeStdLibCallsPass(PR);
   initializeEraVMSHA3ConstFoldingPass(PR);
   initializeEraVMStackAddressConstantPropagationPass(PR);
+  initializeEraVMOptimizeSelectPass(PR);
 }
 
 static std::string computeDataLayout() {
@@ -192,6 +194,7 @@ TargetPassConfig *EraVMTargetMachine::createPassConfig(PassManagerBase &PM) {
 
 void EraVMPassConfig::addIRPasses() {
   addPass(createEraVMLowerIntrinsicsPass());
+  addPass(createEraVMIndexedMemOpsPreparePass());
   addPass(createEraVMLinkRuntimePass(true));
   addPass(createEraVMCodegenPreparePass());
   addPass(createGlobalDCEPass());
@@ -260,4 +263,5 @@ void EraVMPassConfig::addPreEmitPass() {
   addPass(createEraVMCombineAddressingModePass());
   addPass(createEraVMExpandSelectPass());
   addPass(createEraVMExpandPseudoPass());
+  addPass(createEraVMOptimizeSelectPass());
 }

@@ -11,6 +11,7 @@
 #include "MCTargetDesc/EraVMMCTargetDesc.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/OptimizationLevel.h"
@@ -108,6 +109,8 @@ ImmutablePass *createEraVMAAWrapperPass();
 ImmutablePass *createEraVMExternalAAWrapperPass();
 ModulePass *createEraVMAlwaysInlinePass();
 FunctionPass *createEraVMSHA3ConstFoldingPass();
+FunctionPass *createEraVMOptimizeSelectPass();
+Pass *createEraVMIndexedMemOpsPreparePass();
 
 void initializeEraVMLowerIntrinsicsPass(PassRegistry &);
 void initializeEraVMAddConditionsPass(PassRegistry &);
@@ -127,6 +130,8 @@ void initializeEraVMAAWrapperPassPass(PassRegistry &);
 void initializeEraVMExternalAAWrapperPass(PassRegistry &);
 void initializeEraVMAlwaysInlinePass(PassRegistry &);
 void initializeEraVMSHA3ConstFoldingPass(PassRegistry &);
+void initializeEraVMOptimizeSelectPass(PassRegistry &);
+void initializeEraVMIndexedMemOpsPreparePass(PassRegistry &);
 
 struct EraVMLinkRuntimePass : PassInfoMixin<EraVMLinkRuntimePass> {
   EraVMLinkRuntimePass(OptimizationLevel Level) : Level(Level) {}
