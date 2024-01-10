@@ -48,7 +48,8 @@ enum AddressSpaces {
   AS_GENERIC = 3,
   AS_CODE = 4,
   AS_STORAGE = 5,
-  MAX_ADDRESS = AS_STORAGE,
+  AS_TRANSIENT = 6,
+  MAX_ADDRESS = AS_TRANSIENT,
 };
 } // namespace EraVMAS
 
@@ -118,6 +119,8 @@ FunctionPass *createEraVMSHA3ConstFoldingPass();
 FunctionPass *createEraVMOptimizeSelectPass();
 Pass *createEraVMIndexedMemOpsPreparePass();
 FunctionPass *createEraVMTieSelectOperandsPass();
+FunctionPass *createEraVMHoistFlagSettingPass();
+FunctionPass *createEraVMFoldSelectPass();
 
 void initializeEraVMLowerIntrinsicsPass(PassRegistry &);
 void initializeEraVMAddConditionsPass(PassRegistry &);
@@ -140,9 +143,11 @@ void initializeEraVMSHA3ConstFoldingPass(PassRegistry &);
 void initializeEraVMOptimizeSelectPass(PassRegistry &);
 void initializeEraVMIndexedMemOpsPreparePass(PassRegistry &);
 void initializeEraVMTieSelectOperandsPass(PassRegistry &);
+void initializeEraVMHoistFlagSettingPass(PassRegistry &);
+void initializeEraVMFoldSelectPass(PassRegistry &);
 
 struct EraVMLinkRuntimePass : PassInfoMixin<EraVMLinkRuntimePass> {
-  EraVMLinkRuntimePass(OptimizationLevel Level) : Level(Level) {}
+  explicit EraVMLinkRuntimePass(OptimizationLevel Level) : Level(Level) {}
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 
 private:
@@ -151,17 +156,17 @@ private:
 
 struct EraVMOptimizeStdLibCallsPass
     : PassInfoMixin<EraVMOptimizeStdLibCallsPass> {
-  EraVMOptimizeStdLibCallsPass() {}
+  EraVMOptimizeStdLibCallsPass() = default;
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };
 
 struct EraVMAlwaysInlinePass : PassInfoMixin<EraVMAlwaysInlinePass> {
-  EraVMAlwaysInlinePass() {}
+  EraVMAlwaysInlinePass() = default;
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
 
 struct EraVMSHA3ConstFoldingPass : PassInfoMixin<EraVMSHA3ConstFoldingPass> {
-  EraVMSHA3ConstFoldingPass() {}
+  EraVMSHA3ConstFoldingPass() = default;
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };
 
