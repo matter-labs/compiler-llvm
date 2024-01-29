@@ -46,6 +46,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeEraVMTarget() {
   initializeEraVMCodegenPreparePass(PR);
   initializeEraVMCombineAddressingModePass(PR);
   initializeEraVMCombineFlagSettingPass(PR);
+  initializeEraVMCSELegacyPassPass(PR);
   initializeEraVMExpandPseudoPass(PR);
   initializeEraVMExpandSelectPass(PR);
   initializeEraVMExternalAAWrapperPass(PR);
@@ -139,6 +140,12 @@ void EraVMTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
     }
   });
 
+  PB.registerPreInlinerOptimizationsEPCallback(
+      [](ModulePassManager &PM, OptimizationLevel Level) {
+        if (Level != OptimizationLevel::O0)
+          PM.addPass(createModuleToFunctionPassAdaptor(EraVMCSEPass()));
+      });
+
   PB.registerScalarOptimizerLateEPCallback(
       [](FunctionPassManager &PM, OptimizationLevel Level) {
         if (Level.getSizeLevel() || Level.getSpeedupLevel() > 1)
@@ -164,6 +171,10 @@ void EraVMTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
          ArrayRef<PassBuilder::PipelineElement>) {
         if (PassName == "eravm-sha3-constant-folding") {
           PM.addPass(EraVMSHA3ConstFoldingPass());
+          return true;
+        }
+        if (PassName == "eravm-cse") {
+          PM.addPass(EraVMCSEPass());
           return true;
         }
         return false;
@@ -273,8 +284,8 @@ void EraVMPassConfig::addPreSched2() {
 }
 
 void EraVMPassConfig::addPreEmitPass() {
-  addPass(createEraVMCombineAddressingModePass());
   addPass(createEraVMExpandPseudoPass());
+  addPass(createEraVMCombineAddressingModePass());
   addPass(createEraVMExpandSelectPass());
   addPass(createEraVMOptimizeSelectPass());
 }
