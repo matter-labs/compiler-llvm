@@ -56,10 +56,11 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeEraVMTarget() {
   initializeEraVMOptimizeStdLibCallsPass(PR);
   initializeEraVMSHA3ConstFoldingPass(PR);
   initializeEraVMStackAddressConstantPropagationPass(PR);
-  initializeEraVMOptimizeSelectPass(PR);
+  initializeEraVMOptimizeSelectPostRAPass(PR);
   initializeEraVMTieSelectOperandsPass(PR);
   initializeEraVMHoistFlagSettingPass(PR);
-  initializeEraVMFoldSelectPass(PR);
+  initializeEraVMOptimizeSelectPreRAPass(PR);
+  initializeEraVMFoldSimilarInstructionsPass(PR);
 }
 
 static std::string computeDataLayout() {
@@ -161,6 +162,10 @@ void EraVMTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
          ArrayRef<PassBuilder::PipelineElement>) {
         if (PassName == "eravm-always-inline") {
           PM.addPass(EraVMAlwaysInlinePass());
+          return true;
+        }
+        if (PassName == "eravm-lower-intrinsics") {
+          PM.addPass(EraVMLowerIntrinsicsPass());
           return true;
         }
         return false;
@@ -270,7 +275,8 @@ void EraVMPassConfig::addPreRegAlloc() {
     addPass(createEraVMCombineFlagSettingPass());
     // This pass emits indexed loads and stores
     addPass(createEraVMCombineToIndexedMemopsPass());
-    addPass(createEraVMFoldSelectPass());
+    addPass(createEraVMFoldSimilarInstructionsPass());
+    addPass(createEraVMOptimizeSelectPreRAPass());
     addPass(createEraVMHoistFlagSettingPass());
     addPass(&LiveVariablesID);
     addPass(createEraVMTieSelectOperandsPass());
@@ -287,5 +293,5 @@ void EraVMPassConfig::addPreEmitPass() {
   addPass(createEraVMExpandPseudoPass());
   addPass(createEraVMCombineAddressingModePass());
   addPass(createEraVMExpandSelectPass());
-  addPass(createEraVMOptimizeSelectPass());
+  addPass(createEraVMOptimizeSelectPostRAPass());
 }

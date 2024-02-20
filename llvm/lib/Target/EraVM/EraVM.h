@@ -114,12 +114,13 @@ ImmutablePass *createEraVMAAWrapperPass();
 ImmutablePass *createEraVMExternalAAWrapperPass();
 ModulePass *createEraVMAlwaysInlinePass();
 FunctionPass *createEraVMSHA3ConstFoldingPass();
-FunctionPass *createEraVMOptimizeSelectPass();
+FunctionPass *createEraVMOptimizeSelectPostRAPass();
 Pass *createEraVMIndexedMemOpsPreparePass();
 FunctionPass *createEraVMTieSelectOperandsPass();
 FunctionPass *createEraVMHoistFlagSettingPass();
-FunctionPass *createEraVMFoldSelectPass();
+FunctionPass *createEraVMOptimizeSelectPreRAPass();
 FunctionPass *createEraVMCSEPass();
+FunctionPass *createEraVMFoldSimilarInstructionsPass();
 
 void initializeEraVMLowerIntrinsicsPass(PassRegistry &);
 void initializeEraVMAddConditionsPass(PassRegistry &);
@@ -139,12 +140,13 @@ void initializeEraVMAAWrapperPassPass(PassRegistry &);
 void initializeEraVMExternalAAWrapperPass(PassRegistry &);
 void initializeEraVMAlwaysInlinePass(PassRegistry &);
 void initializeEraVMSHA3ConstFoldingPass(PassRegistry &);
-void initializeEraVMOptimizeSelectPass(PassRegistry &);
+void initializeEraVMOptimizeSelectPostRAPass(PassRegistry &);
 void initializeEraVMIndexedMemOpsPreparePass(PassRegistry &);
 void initializeEraVMTieSelectOperandsPass(PassRegistry &);
 void initializeEraVMHoistFlagSettingPass(PassRegistry &);
-void initializeEraVMFoldSelectPass(PassRegistry &);
+void initializeEraVMOptimizeSelectPreRAPass(PassRegistry &);
 void initializeEraVMCSELegacyPassPass(PassRegistry &);
+void initializeEraVMFoldSimilarInstructionsPass(PassRegistry &);
 
 struct EraVMLinkRuntimePass : PassInfoMixin<EraVMLinkRuntimePass> {
   explicit EraVMLinkRuntimePass(OptimizationLevel Level) : Level(Level) {}
@@ -173,6 +175,11 @@ struct EraVMSHA3ConstFoldingPass : PassInfoMixin<EraVMSHA3ConstFoldingPass> {
 struct EraVMCSEPass : PassInfoMixin<EraVMCSEPass> {
   EraVMCSEPass() = default;
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
+
+struct EraVMLowerIntrinsicsPass : PassInfoMixin<EraVMLowerIntrinsicsPass> {
+  EraVMLowerIntrinsicsPass() = default;
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
 
 } // namespace llvm
