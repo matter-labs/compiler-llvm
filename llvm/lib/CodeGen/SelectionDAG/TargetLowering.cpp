@@ -4301,7 +4301,8 @@ SDValue TargetLowering::SimplifySetCC(EVT VT, SDValue N0, SDValue N1,
 
     // EraVM local begin
     // Load narrowing is not profiable for EraVM
-    if (!DAG.getTarget().getTargetTriple().isEraVM()) {
+    if (!DAG.getTarget().getTargetTriple().isEraVM() &&
+        !DAG.getTarget().getTargetTriple().isEVM()) {
     // EraVM local end
     // If the LHS is '(and load, const)', the RHS is 0, the test is for
     // equality or unsigned, and all 1 bits of the const are in the same
@@ -8475,8 +8476,7 @@ TargetLowering::expandUnalignedLoad(LoadSDNode *LD, SelectionDAG &DAG) const {
   if (auto ConstPtr = dyn_cast<ConstantSDNode>(Ptr))
     Aligned = ConstPtr->getAPIntValue().urem(32) == 0;
   if (!Aligned && DAG.getTarget().getTargetTriple().isEraVM()) {
-    unsigned NumBits = LoadedVT.getSizeInBits();
-    assert(NumBits == 256);
+    assert(LoadedVT.getSizeInBits() == 256);
     auto Const32 = DAG.getConstant(APInt(256, 32, false), dl, MVT::i256);
     auto Const8 = DAG.getConstant(APInt(256, 8, false), dl, MVT::i256);
     auto Zero = DAG.getConstant(APInt(256, 0, false), dl, MVT::i256);
@@ -8664,8 +8664,7 @@ SDValue TargetLowering::expandUnalignedStore(StoreSDNode *ST,
   if (auto ConstPtr = dyn_cast<ConstantSDNode>(Ptr))
     Aligned = ConstPtr->getAPIntValue().urem(32) == 0;
   if (!Aligned && DAG.getTarget().getTargetTriple().isEraVM()) {
-    unsigned NumBits = StoreMemVT.getSizeInBits();
-    assert(NumBits == 256);
+    assert(StoreMemVT.getSizeInBits() == 256);
     auto Const32 = DAG.getConstant(APInt(256, 32, false), dl, MVT::i256);
     auto Const8 = DAG.getConstant(APInt(256, 8, false), dl, MVT::i256);
     auto Zero = DAG.getConstant(APInt(256, 0, false), dl, MVT::i256);
